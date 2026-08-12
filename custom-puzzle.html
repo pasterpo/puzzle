@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>P-Ϟ · custom puzzle</title>
+<style>
+  :root{
+    --ground:#0d0f12; --surface:#14171b; --sunken:#1b1f25;
+    --ink:#e9ebee; --ink-2:#b8bec7; --muted:#8d949e; --faint:#6a717b;
+    --line:#23272e; --line-2:#2f343c;
+    --accent:#00d0b1;
+    --life:#ff6b8a; --level:#8bd46f; --steps:#d4a843;
+    --danger:#ef7167; --ok:#4bb98a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:var(--ground); color:var(--ink);
+    font-family: ui-monospace, "Space Mono", "IBM Plex Mono", Menlo, monospace;
+    display:flex; align-items:center; justify-content:center; padding:40px 16px;
+  }
+  .wrap{ width:100%; max-width:520px; }
+  .kicker{
+    text-align:center; font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--muted); margin:0;
+  }
+  h1{
+    text-align:center; font-size:26px; font-weight:500; letter-spacing:-.01em;
+    margin:6px 0 28px;
+  }
+  .toprow{
+    display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:26px;
+  }
+  .btn{
+    border:1px solid rgba(230,230,230,.14); border-radius:8px; padding:10px 15px;
+    background:linear-gradient(180deg, rgba(255,255,255,.08), transparent 46%),
+               linear-gradient(180deg, #11161a, #07090b);
+    color:var(--ink); font:inherit; font-weight:700; cursor:pointer;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 -2px 0 rgba(0,0,0,.56),
+                0 5px 0 rgba(0,0,0,.58), 0 14px 28px rgba(0,0,0,.26);
+  }
+  .btn:hover{ border-color: color-mix(in srgb, var(--accent) 52%, var(--line-2)); }
+  .btn:active{ transform: translateY(3px); }
+  .btn.ghost{ background:transparent; color:var(--muted); box-shadow:none; font-weight:500; }
+  .display{
+    background:#111418; border:1px solid var(--line-2); border-radius:8px;
+    padding:24px 28px; font-size:1.6rem; line-height:1.6; letter-spacing:.06em;
+    box-shadow:0 8px 32px rgba(0,0,0,.45);
+    min-height:110px;
+  }
+  .display .q{ color:var(--ink-2); }
+  .display .cur{ color:var(--ink); }
+  .hud{
+    display:flex; flex-direction:column; gap:14px; margin-top:22px;
+    border:1px solid rgba(230,230,230,.08); border-radius:8px;
+    background:rgba(255,255,255,.03); padding:14px 18px;
+  }
+  .hud-row{ display:flex; justify-content:space-between; gap:24px; }
+  .pip-block{ font-size:.74rem; color:var(--muted); }
+  .pip-label{ margin-bottom:5px; }
+  .pip-row{ display:flex; gap:5px; }
+  .pip{ width:9px; height:9px; border-radius:50%; background:rgba(230,230,230,.18); }
+  .pip.filled.life{ background:var(--life); box-shadow:0 0 12px rgba(255,107,138,.35); }
+  .pip.filled.level{ background:var(--level); box-shadow:0 0 12px rgba(139,212,111,.35); }
+  .pip-value{ color:var(--ink); margin-top:4px; }
+  .steps-block{ margin-top:2px; }
+  .steps-meta{ display:flex; justify-content:space-between; font-size:.78rem; color:var(--muted); margin-bottom:8px; }
+  .bar{ height:18px; border-radius:5px; background:rgba(230,230,230,.09); border:1px solid rgba(230,230,230,.14); overflow:hidden; position:relative; }
+  .bar-fill{ height:100%; background:linear-gradient(180deg, #e9c877, var(--steps)); transition: width .2s ease; }
+  .actions{ display:flex; gap:10px; justify-content:center; margin-top:24px; flex-wrap:wrap; }
+  .abtn{
+    min-width:64px; min-height:52px; padding:10px 20px; border-radius:8px;
+    border:1px solid rgba(230,230,230,.14);
+    background:linear-gradient(180deg, rgba(255,255,255,.08), transparent 46%),
+               linear-gradient(180deg, #11161a, #07090b);
+    color:var(--ink); font:inherit; font-weight:800; font-size:1.05rem; cursor:pointer;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.12), inset 0 -2px 0 rgba(0,0,0,.56),
+                0 5px 0 rgba(0,0,0,.58), 0 14px 28px rgba(0,0,0,.26);
+  }
+  .abtn:hover{ border-color: color-mix(in srgb, var(--accent) 52%, rgba(230,230,230,.14)); }
+  .abtn:active{ transform: translateY(3px); }
+  .abtn:disabled{ opacity:.35; cursor:not-allowed; }
+  .goal{ text-align:center; margin-top:16px; font-size:.85rem; color:var(--muted); }
+  .goal b{ color:var(--ink-2); }
+  .status{
+    display:none; margin-top:22px; text-align:center; padding:18px 20px;
+    border-radius:10px; border:1px solid var(--line-2); background:rgba(255,255,255,.03);
+  }
+  .status.show{ display:block; }
+  .status.win{ border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 8%, rgba(255,255,255,.03)); }
+  .status.lose{ border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 8%, rgba(255,255,255,.03)); }
+  .status p{ margin:0 0 14px; }
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(5,5,6,.85); backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal{
+    background:#111418; border:1px solid var(--line-2); border-radius:8px;
+    padding:32px 36px; max-width:440px; text-align:center;
+  }
+  .modal h2{ margin:0 0 14px; font-size:1.2rem; letter-spacing:.1em; text-transform:uppercase; }
+  .modal p{ color:var(--ink-2); line-height:1.6; font-size:.92rem; margin:0 0 22px; }
+  .hidden{ display:none; }
+  .footnote{ text-align:center; margin-top:20px; font-size:11px; color:var(--faint); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="kicker">play session · custom</p>
+  <h1 id="levelTitle">P-Ϟ · Level 1</h1>
+
+  <div class="toprow">
+    <button class="btn ghost" onclick="restartLevel()">New game</button>
+    <button class="btn ghost" onclick="showInstructions()">Instructions</button>
+  </div>
+
+  <div class="display">
+    <div class="q">N = <span id="goalDisplay"></span></div>
+    <div class="cur">N = <span id="curDisplay"></span> (current)</div>
+  </div>
+
+  <div class="goal">Reach <b>N = 0</b>. Rules aren't shown — figure them out.</div>
+
+  <div class="actions">
+    <button class="abtn" id="btnA" onclick="press('A')">A</button>
+    <button class="abtn" id="btnB" onclick="press('B')">B</button>
+    <button class="abtn" id="btnC" onclick="press('C')">C</button>
+  </div>
+
+  <div class="hud">
+    <div class="hud-row">
+      <div class="pip-block">
+        <div class="pip-label">Lives</div>
+        <div class="pip-row" id="livesRow"></div>
+        <div class="pip-value" id="livesText">3/3</div>
+      </div>
+      <div class="pip-block" style="text-align:right;">
+        <div class="pip-label">Level</div>
+        <div class="pip-row" id="levelRow" style="justify-content:flex-end;"></div>
+        <div class="pip-value" id="levelText">1/3</div>
+      </div>
+    </div>
+    <div class="steps-block">
+      <div class="steps-meta"><span>Steps left</span><span id="stepsText">10/10</span></div>
+      <div class="bar"><div class="bar-fill" id="stepsBar" style="width:100%;"></div></div>
+    </div>
+  </div>
+
+  <div class="status" id="statusBox">
+    <p id="statusMsg"></p>
+    <button class="btn" onclick="nextAction()" id="statusBtn">Continue</button>
+  </div>
+
+  <p class="footnote">3 levels · no creative mode</p>
+</div>
+
+<div class="modal-overlay" id="introOverlay">
+  <div class="modal">
+    <h2>Instructions</h2>
+    <p>We are not going to tell you the rules. Three actions — A, B, C — each do something to N. Same action doesn't always do the same thing. Figure it out, reach N = 0, before you run out of steps or lives.</p>
+    <button class="btn" onclick="closeIntro()">Enter ↵</button>
+  </div>
+</div>
+
+<script>
+const LEVELS = [
+  { start: 6,  steps: 8,  lives: 3 },   // easiest
+  { start: 5,  steps: 10, lives: 3 },   // medium
+  { start: 13, steps: 10, lives: 3 },   // hardest — exact-fit solve
+];
+
+let levelIdx = 0;
+let N, nextA, forceA, forceB, stepsLeft, livesLeft, lockActions;
+
+function initLevel(i){
+  const cfg = LEVELS[i];
+  N = cfg.start;
+  nextA = 4;
+  forceA = false;
+  forceB = false;
+  stepsLeft = cfg.steps;
+  livesLeft = livesLeft === undefined ? cfg.lives : livesLeft;
+  lockActions = false;
+  render();
+}
+
+function restartLevel(){
+  const cfg = LEVELS[levelIdx];
+  N = cfg.start;
+  nextA = 4;
+  forceA = false;
+  forceB = false;
+  stepsLeft = cfg.steps;
+  lockActions = false;
+  document.getElementById('statusBox').classList.remove('show','win','lose');
+  render();
+}
+
+function showInstructions(){ document.getElementById('introOverlay').style.display = 'flex'; }
+function closeIntro(){ document.getElementById('introOverlay').style.display = 'none'; }
+
+function press(act){
+  if (lockActions) return;
+  if (act === 'A'){
+    if (forceA){ N += 4; forceA = false; }
+    else { N += nextA; nextA = -nextA; }
+  } else if (act === 'B'){
+    if (forceB){ N += 3; forceB = false; }
+    else { N -= 3; }
+  } else if (act === 'C'){
+    forceA = true; forceB = true;
+  }
+  stepsLeft -= 1;
+
+  if (N === 0){
+    lockActions = true;
+    render();
+    endLevel(true);
+    return;
+  }
+  if (stepsLeft <= 0){
+    lockActions = true;
+    render();
+    endLevel(false);
+    return;
+  }
+  render();
+}
+
+function endLevel(won){
+  const box = document.getElementById('statusBox');
+  const msg = document.getElementById('statusMsg');
+  const btn = document.getElementById('statusBtn');
+  box.classList.add('show');
+  if (won){
+    box.classList.add('win'); box.classList.remove('lose');
+    msg.textContent = (levelIdx === LEVELS.length - 1)
+      ? 'All 3 levels cleared. N = 0 reached.'
+      : 'Level ' + (levelIdx+1) + ' cleared — N = 0 reached.';
+    btn.textContent = (levelIdx === LEVELS.length - 1) ? 'Done' : 'Next level →';
+  } else {
+    livesLeft -= 1;
+    box.classList.add('lose'); box.classList.remove('win');
+    if (livesLeft <= 0){
+      msg.textContent = 'Out of steps. Out of lives. Game over.';
+      btn.textContent = 'Restart from Level 1';
+    } else {
+      msg.textContent = 'Out of steps at N = ' + N + '. Lives left: ' + livesLeft + '.';
+      btn.textContent = 'Try again';
+    }
+  }
+  render();
+}
+
+function nextAction(){
+  const box = document.getElementById('statusBox');
+  box.classList.remove('show','win','lose');
+  const wasWin = N === 0;
+  if (wasWin){
+    if (levelIdx === LEVELS.length - 1){
+      // finished all levels — just restart from level 1 fresh
+      levelIdx = 0; livesLeft = undefined;
+      initLevel(0);
+      return;
+    }
+    levelIdx += 1;
+    initLevel(levelIdx);
+  } else {
+    if (livesLeft <= 0){
+      levelIdx = 0; livesLeft = undefined;
+      initLevel(0);
+    } else {
+      restartLevel();
+    }
+  }
+}
+
+function render(){
+  document.getElementById('levelTitle').textContent = 'P-Ϟ · Level ' + (levelIdx+1);
+  document.getElementById('goalDisplay').textContent = '0';
+  document.getElementById('curDisplay').textContent = N;
+
+  // lives pips
+  const livesRow = document.getElementById('livesRow');
+  livesRow.innerHTML = '';
+  for (let i=0;i<3;i++){
+    const p = document.createElement('div');
+    p.className = 'pip' + (i < livesLeft ? ' filled life' : '');
+    livesRow.appendChild(p);
+  }
+  document.getElementById('livesText').textContent = livesLeft + '/3';
+
+  // level pips
+  const levelRow = document.getElementById('levelRow');
+  levelRow.innerHTML = '';
+  for (let i=0;i<LEVELS.length;i++){
+    const p = document.createElement('div');
+    p.className = 'pip' + (i <= levelIdx ? ' filled level' : '');
+    levelRow.appendChild(p);
+  }
+  document.getElementById('levelText').textContent = (levelIdx+1) + '/' + LEVELS.length;
+
+  // steps
+  const cfgSteps = LEVELS[levelIdx].steps;
+  document.getElementById('stepsText').textContent = stepsLeft + '/' + cfgSteps;
+  document.getElementById('stepsBar').style.width = Math.max(0,(stepsLeft/cfgSteps*100)) + '%';
+
+  // action buttons
+  ['A','B','C'].forEach(a => {
+    document.getElementById('btn'+a).disabled = lockActions;
+  });
+}
+
+initLevel(0);
+</script>
+</body>
+</html>
