@@ -223,9 +223,22 @@ function closeIntro(){ document.getElementById('introOverlay').style.display = '
 
 function press(act){
   if (lockActions) return;
-  if (act === 'A' && uA >= 5) return;
-  if (act === 'B' && uB >= 5) return;
-  if (act === 'C' && uC >= 5) return;
+
+  // A maxed-out charge track [<<<<<] means this action is locked: clicking it
+  // still costs a step, but does nothing to N or the charge tracks. No disabled
+  // button, no free hint — the only way to notice is to watch the rows yourself.
+  const isLocked = (act === 'A' && uA >= 5) || (act === 'B' && uB >= 5) || (act === 'C' && uC >= 5);
+  if (isLocked){
+    stepsLeft -= 1;
+    if (stepsLeft <= 0){
+      lockActions = true;
+      render();
+      endLevel(false);
+      return;
+    }
+    render();
+    return;
+  }
 
   if (act === 'A'){
     if (forceA){ N += 4; forceA = false; }
@@ -352,10 +365,11 @@ function render(){
   document.getElementById('stepsText').textContent = stepsLeft + '/' + cfgSteps;
   document.getElementById('stepsBar').style.width = Math.max(0,(stepsLeft/cfgSteps*100)) + '%';
 
-  // action buttons — disabled on win/lose lock, or when that action's charge track is maxed
-  document.getElementById('btnA').disabled = lockActions || uA >= 5;
-  document.getElementById('btnB').disabled = lockActions || uB >= 5;
-  document.getElementById('btnC').disabled = lockActions || uC >= 5;
+  // action buttons — only disabled once the level is won/lost, never for a maxed charge track
+  // (a locked track still lets you click it, it just wastes the step — no free hint)
+  document.getElementById('btnA').disabled = lockActions;
+  document.getElementById('btnB').disabled = lockActions;
+  document.getElementById('btnC').disabled = lockActions;
 }
 
 initLevel(0);
